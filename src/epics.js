@@ -1,7 +1,7 @@
 import createEtcd from '@team-griffin/browser-etcd';
 import * as messages from './messages';
 import * as signals from './signals';
-import { getKeys } from './repository';
+import { getKey } from './repository';
 import { combineEpics } from 'redux-observable';
 import { getServiceDiscoveryHosts } from './selectors';
 import { reduce, pipe } from 'ramda';
@@ -10,10 +10,13 @@ import isError from 'lodash.iserror';
 import 'rxjs/add/operator/catch';
 // Static
 import { concat as concatStatic } from 'rxjs/observable/concat';
+import { merge as mergeStatic } from 'rxjs/observable/merge';
 // Binders
 import { of } from 'rxjs/observable/of';
 import { map } from 'rxjs/operator/map';
 import { switchMap } from 'rxjs/operator/switchMap';
+import { skip } from 'rxjs/operator/skip';
+import { take } from 'rxjs/operator/take';
 
 const etcdFactory = pipe(
   (store) => store.getState(),
@@ -22,7 +25,7 @@ const etcdFactory = pipe(
   }),
 );
 
-export const configure = (actions$) => {
+export const configureEpic = (actions$) => {
   return actions$.ofType(signals.CONFIGURE)
     ::map(({
       payload,
@@ -31,59 +34,84 @@ export const configure = (actions$) => {
     });
 };
 
+export const _fetchServiceEpic = (etcdFactory, actions$, store) => {
+  return actions$.ofType(signals.FETCH_SERVICE)
+    ::switchMap((action) => {
+      const {
+        key
+      } = action.payload;
+
+      const etcd = etcdFactory(store);
+
+      const fetched$ = getKey(etcd, key)
+        ::map((data) => {
+          return messages.fetchSuccess(key, data.node);
+        })
+        .catch((err) => {
+          return of(messages.fetchFailure(key, err));
+        });
+
+      return concatStatic(
+        of(messages.fetching(key)),
+        fetched$,
+      );
+    });
+};
+
 // eslint-disable-next-line no-underscore-dangle, no-shadow
-export const _fetchServices = (etcdFactory, actions$, store) => {
+export const fetchServicesEpic = (actions$, store) => {
   return actions$.ofType(signals.FETCH_SERVICES)
     ::switchMap(({
       payload,
     }) => {
-      const fetchingMsgs = reduce((result, etcdKey) => {
+      const {
+        keys
+      } = payload;
+
+      const fetchSignals = reduce((acc, key) => {
         return [
-          ...result,
-          messages.fetching(etcdKey),
+          ...acc,
+          signals.fetchService(key),
         ];
-      }, [], payload.keys);
+      }, [], keys);
 
-      const etcd = etcdFactory(store);
-
-      const fetched$ = getKeys(payload.keys, etcd)
-        ::switchMap((services) => {
-          const msgs = reduce((results, data, key) => {
-            if (isError(data) === true) {
-              return [
-                ...results,
-                messages.fetchFailure(key, data),
-              ];
-            }
-
-            return [
-              ...results,
-              messages.fetchSuccess(key, data.node),
-            ];
-          }, [], services);
-
-          return of(...msgs, messages.fetchComplete(payload.keys));
-        });
-
-      return concatStatic(
-        of(...fetchingMsgs),
-        fetched$,
-      );
-
+      return of(...fetchSignals);
     });
 };
 
-export const fetchServices = (...args) => {
-  return _fetchServices(etcdFactory, ...args);
+export const completeFetchServicesEpic = (actions$) => {
+  return actions$.ofType(signals.FETCH_SERVICES)
+    ::switchMap(({ payload }) => {
+      const {
+        keys
+      } = payload;
+
+      return actions$
+        .ofType(
+          messages.FETCH_SUCCESS,
+          messages.FETCH_FAILURE,
+        )
+        ::skip(keys.length - 1)
+        ::take(1)
+        ::map(() => {
+          return messages.fetchComplete(keys);
+        });
+    });
 };
 
-export const root = () => {
+export const fetchServiceEpic = (...args) => {
+  return _fetchServiceEpic(etcdFactory, ...args);
+};
+
+export const rootEpic = () => {
   return combineEpics(
-    configure,
-    fetchServices,
+    configureEpic,
+    completeFetchServicesEpic,
+    fetchServiceEpic,
+    fetchServicesEpic,
   );
 };
 
-export default root;
+export default rootEpic;
 
 

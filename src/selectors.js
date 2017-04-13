@@ -1,5 +1,5 @@
 import { createSelector } from 'reselect';
-import { reduce } from 'ramda';
+import { map } from 'ramda';
 
 export const getServiceDiscovery = (state) => {
   return state.serviceDiscovery;
@@ -28,11 +28,5 @@ export const getRawServices = createSelector(
 
 export const getKeyValueServices = createSelector(
   getRawServices,
-  reduce((results, service, key) => {
-    return {
-      ...results,
-      [key]: service.node.value,
-    };
-  }, {
-  }),
+  map((service) => service.node.value),
 );
