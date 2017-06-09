@@ -1,29 +1,18 @@
-import { fromPromise } from 'rxjs/observable/fromPromise';
-import { of } from 'rxjs/observable/of';
-import 'rxjs/add/operator/catch';
-import { map as rMap, reduce } from 'ramda';
-import { forkJoin } from 'rxjs/observable/forkJoin';
-import { map } from 'rxjs/operator/map';
+import { fromColdPromise } from './utils';
+import * as most from 'most';
+import * as r from 'ramda';
+
+const mmapc = r.curry(most.map);
+const reduceIndexed = r.addIndex(r.reduce);
 
 export const getKey = (etcd, key) => {
-  return fromPromise(etcd.get(key));
+  return fromColdPromise(() => etcd.get(key));
 };
 
 export const getKeys = (etcd, keys) => {
-  const obs = rMap((key) => {
-    return getKey(key, etcd)
-      .catch((err) => {
-        return of(err);
-      });
-  }, keys);
+  const observables = r.map((key) => getKey(key, etcd))(keys);
 
-  return forkJoin(...obs)::map((values) => {
-    return reduce((result, value, index) => {
-      return {
-        ...result,
-        [keys[index]]: value,
-      };
-    }, {
-    }, values);
-  });
+  return r.pipe(
+    most.combineArray(Array.of),
+  )(observables);
 };
