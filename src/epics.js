@@ -2,7 +2,7 @@ import createEtcd from '@team-griffin/browser-etcd';
 import * as messages from './messages';
 import * as signals from './signals';
 import { getKey } from './repository';
-import { combineEpics, select } from 'redux-most';
+import { combineEpics, select, selectArray } from 'redux-most';
 import { getServiceDiscoveryHosts } from './selectors';
 import isError from 'lodash.iserror';
 import * as r from 'ramda';
@@ -21,10 +21,10 @@ const mrecoverWithc = r.curry(most.recoverWith);
 const mskipc = r.curry(most.skip);
 const mtakec = r.curry(most.take);
 
-export const configureEpic = r.pipe(
+export const configureEpic = (actions$) => r.pipe(
   select(signals.CONFIGURE),
   mmapc((action) => messages.configured(action.payload.config)),
-);
+)(actions$);
 
 export const _fetchServiceEpic = (
   etcdFactory,
@@ -49,7 +49,7 @@ export const _fetchServiceEpic = (
       mstartWithc(messages.fetching(key)),
     )(item$);
   }),
-  most.switchLatest,
+  most.join,
 )(actions$);
 
 // eslint-disable-next-line no-underscore-dangle, no-shadow
@@ -96,10 +96,10 @@ export const fetchServiceEpic = (...args) => {
 };
 
 export const rootEpic = () => {
-  return combineEpics(
+  return combineEpics([
     configureEpic,
     completeFetchServicesEpic,
     fetchServiceEpic,
     fetchServicesEpic,
-  );
+  ]);
 };

@@ -1,75 +1,39 @@
-// import { configureEpic, _fetchServiceEpic, fetchServicesEpic, rootEpic, completeFetchServicesEpic } from '../epics';
-// import { expect } from 'chai';
-// import configureMockStore from 'redux-mock-store';
-// import { createEpicMiddleware, combineEpics } from 'redux-observable';
-// import { ReplaySubject } from 'rxjs/ReplaySubject';
-// import { ignoreElements } from 'rxjs/operator/ignoreElements';
-// import { skip } from 'rxjs/operator/skip';
-// import { take } from 'rxjs/operator/take';
-// import { _do as execute } from 'rxjs/operator/do';
-// import * as signals from '../signals';
-// import * as messages from '../messages';
-// import sinon from 'sinon';
-// import after from 'lodash.after';
+import * as epics from '../epics';
+import { expect } from 'chai';
+import configureMockStore from 'redux-mock-store';
+import * as signals from '../signals';
+import * as messages from '../messages';
+import sinon from 'sinon';
+import * as most from 'most';
+import * as r from 'ramda';
 
-// const createDebugEpic = () => {
-//   const subject = new ReplaySubject();
+describe('epics', function() {
+  describe('::configureEpic', function() {
+    beforeEach(function() {
+      const mockStore = configureMockStore([]);
+      this.store = mockStore();
+    });
 
-//   return {
-//     debugSubject: subject,
-//     debugEpic: (actions$) => {
-//       return actions$
-//         ::execute((action) => {
-//           subject.next(action);
-//         })
-//         ::ignoreElements();
-//     }
-//   };
-// };
+    it('maps the CONFIGURE signal to CONFIGURED message', function(done) {
+      const actions$ = most.of(signals.configure({ foo: 'bar' }));
+      const epic$ = epics.configureEpic(actions$);
 
+      epic$.reduce((acc, x) => r.append(x)(acc), []).then((actions) => {
+        expect(actions).to.have.length(1);
+        expect(actions[0].type).to.eql(messages.configured({ foo: 'bar' }).type);
+        done();
+      }, done);
+    });
 
-// describe('epics', function() {
-//   beforeEach(function() {
-//     const {
-//       debugSubject,
-//       debugEpic,
-//     } = createDebugEpic();
+    // it('puts the signal config into the message config', function(done) {
+    //   this.debugSubject::skip(1)::take(1).subscribe((action) => {
+    //     expect(action.payload).to.eql(messages.configured({ foo: 'bar' }).payload);
+    //     done();
+    //   });
 
-//     this.debugSubject = debugSubject;
-//     this.debugEpic = debugEpic;
-//   });
-
-//   describe('::configureEpic', function() {
-//     beforeEach(function() {
-//       const epicMiddleware = createEpicMiddleware(
-//         combineEpics(
-//           this.debugEpic,
-//           configureEpic,
-//         )
-//       );
-
-//       const mockStore = configureMockStore([ epicMiddleware ]);
-//       this.store = mockStore();
-//     });
-
-//     it('maps the CONFIGURE signal to CONFIGURED message', function(done) {
-//       this.debugSubject::skip(1)::take(1).subscribe((action) => {
-//         expect(action.type).to.eql(messages.configured({ foo: 'bar' }).type);
-//         done();
-//       });
-
-//       this.store.dispatch(signals.configure({ foo: 'bar' }));
-//     });
-
-//     it('puts the signal config into the message config', function(done) {
-//       this.debugSubject::skip(1)::take(1).subscribe((action) => {
-//         expect(action.payload).to.eql(messages.configured({ foo: 'bar' }).payload);
-//         done();
-//       });
-
-//       this.store.dispatch(signals.configure({ foo: 'bar' }));
-//     });
-//   });
+    //   this.store.dispatch(signals.configure({ foo: 'bar' }));
+    // });
+  });
 
 //   describe('::_fetchServiceEpic', function() {
 //     beforeEach(function() {
@@ -161,35 +125,24 @@
 //     });
 //   });
 
-//   describe('::fetchServicesEpic', function() {
-//     beforeEach(function() {
-//       const epicMiddleware = createEpicMiddleware(
-//         combineEpics(
-//           this.debugEpic,
-//           fetchServicesEpic,
-//         )
-//       );
+  describe('::fetchServicesEpic', function() {
+    beforeEach(function() {
+      const mockStore = configureMockStore([]);
+      this.store = mockStore();
+    });
 
-//       const mockStore = configureMockStore([ epicMiddleware ]);
-//       this.store = mockStore();
-//     });
+    it('emits FETCH_SERVICE signals for each key', function(done) {
+      const actions$ = most.of(signals.fetchServices(['foo', 'bar']));
+      const epic$ = epics.fetchServicesEpic(actions$);
 
-//     it('emits FETCH_SERVICE signals for each key', function(done) {
-//       const vote = after(2, done);
-
-//       this.debugSubject::skip(1)::take(1).subscribe((action) => {
-//         expect(action).to.eql(signals.fetchService('foo'));
-//         vote();
-//       });
-
-//       this.debugSubject::skip(2)::take(1).subscribe((action) => {
-//         expect(action).to.eql(signals.fetchService('bar'));
-//         vote();
-//       });
-
-//       this.store.dispatch(signals.fetchServices(['foo', 'bar']));
-//     });
-//   });
+      epic$.reduce((acc, x) => r.append(x)(acc), []).then((actions) => {
+        expect(actions).to.have.length(2);
+        expect(actions[0]).to.eql(signals.fetchService('foo'));
+        expect(actions[1]).to.eql(signals.fetchService('bar'));
+        done();
+      }, done);
+    });
+  });
 
 //   describe('::completeFetchServicesEpic', function() {
 //     beforeEach(function() {
@@ -254,4 +207,4 @@
 //   describe('::rootEpic', function() {
 
 //   });
-// });
+});

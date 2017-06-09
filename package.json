@@ -19,10 +19,12 @@
     "test:single": "yarn run test -- --single",
     "ci": "npm run lint && npm run test && npm run build",
     "postmerge": "yarn",
-    "dockerfile:ci": "dockerscript ./docker/ci/dockerfile.js ./docker/ci/Dockerfile"
+    "dockerfile:ci": "dockerscript ./docker/ci/dockerfile.js ./docker/ci/Dockerfile",
+    "prepare": "install-self-peers -- --ignore-scripts"
   },
   "devDependencies": {
     "@team-griffin/eslint-config": "^1.0.0",
+    "@team-griffin/install-self-peers": "^1.1.0",
     "babel-cli": "^6.23.0",
     "babel-core": "^6.1.21",
     "babel-eslint": "^7.2.1",
